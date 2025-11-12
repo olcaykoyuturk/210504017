@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Freelancer Escrow DApp</title>
+
+  <!-- Ethers v6 (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#f7f7f9;
+      --card:#ffffff;
+      --text:#111111;
+      --muted:#666666;
+      --border:#dddddd;
+      --accent:#222222;
+      --accent-contrast:#ffffff;
+      --danger:#b00020;
+      --ok:#0a7d2b;
+      --chip-bg:#f0f0f3;
+      --shadow: 0 6px 18px rgba(0,0,0,.10);
+      --placeholder: #888;
+    }
+    [data-theme="dark"]{
+      --bg:#0e1116;
+      --card:#121722;
+      --text:#e6e6e6;
+      --muted:#9aa4b2;
+      --border:#2a3140;
+      --accent:#6ea8fe;
+      --accent-contrast:#0b1020;
+      --danger:#ff5c7c;
+      --ok:#5bd588;
+      --chip-bg:#1a2233;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --placeholder:#9aa4b2;
+    }
+
+    html,body{height:100%}
+    body{
+      font-family: system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+      margin:0; background:var(--bg); color:var(--text);
+    }
+    ::placeholder{ color: var(--placeholder); opacity: 1; }
+
+    .wrap{max-width:1080px;margin:20px auto;padding:0 16px}
+    h1,h2,h3{margin:8px 0 10px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .spacer{height:8px}
+    .muted{color:var(--muted)}
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      box-shadow: var(--shadow);
+    }
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+
+    input,textarea,select{
+      width:100%; padding:10px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:transparent;
+      color:var(--text);
+      outline:none;
+    }
+    textarea{min-height:90px; resize:vertical}
+
+    .btn{
+      padding:9px 12px; border:1px solid var(--accent);
+      background:var(--accent); color:var(--accent-contrast);
+      border-radius:10px; cursor:pointer; transition:.15s all ease;
+    }
+    .btn:hover{ opacity:.92; transform: translateY(-1px); }
+    .btn:active{ transform: translateY(0); }
+    .btn.secondary{
+      background:transparent; color:var(--text); border-color:var(--border);
+    }
+    .btn.ghost{
+      background:transparent; color:var(--text); border-color:var(--border);
+      opacity:.9;
+    }
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+    .tag{
+      font-size:12px;padding:4px 10px;border-radius:999px;
+      border:1px solid var(--border);display:inline-block;
+      background: var(--chip-bg);
+    }
+    .tag.ok{border-color:var(--ok); color:var(--ok); background:transparent}
+    .tag.danger{border-color:var(--danger); color:var(--danger); background:transparent}
+
+    .badge{
+      font-size:11px;padding:2px 8px;border-radius:999px;
+      background:var(--border);color:var(--text);display:inline-block
+    }
+
+    /* Header */
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .toolbar{display:flex;gap:8px;align-items:center}
+
+    /* Modal */
+    #roleModal{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.55); z-index:9999;
+      backdrop-filter: blur(2px);
+    }
+    #roleModal .modal-content{
+      background:var(--card); color:var(--text);
+      border:1px solid var(--border); padding:24px 22px;
+      border-radius:14px; width:min(92%,420px);
+      box-shadow: var(--shadow);
+    }
+
+    /* Toasts */
+    #toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:10000}
+    .toast{
+      background:var(--card); color:var(--text);
+      border:1px solid var(--border); border-left:5px solid var(--accent);
+      padding:10px 12px; border-radius:10px; box-shadow: var(--shadow)
+    }
+    .toast.ok{border-left-color:var(--ok)}
+    .toast.err{border-left-color:var(--danger)}
+
+    /* Section spacing */
+    .section{margin:18px 0}
+    .kicker{font-size:12px; letter-spacing:.4px; text-transform:uppercase; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Üst başlık -->
+    <div class="header">
+      <div>
+        <div class="kicker">Sepolia • Smart Escrow</div>
+        <h2 style="margin:4px 0 0">Freelancer Escrow</h2>
+        <div class="muted">Güvenli freelance ödeme sistemi</div>
+      </div>
+      <div class="toolbar">
+        <button id="theme" class="btn ghost" title="Tema">🌓 Tema</button>
+        <button id="connect" class="btn">Cüzdan Bağla</button>
+      </div>
+    </div>
+
+    <!-- Kullanıcı çubuğu -->
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div class="row">
+        <div id="addr" class="muted">Bağlı değil</div>
+        <div id="roleChip" class="tag" style="display:none">Rol: -</div>
+        <div id="openBadge" class="badge" style="display:none"></div>
+      </div>
+      <div class="row">
+        <button id="changeRole" class="btn secondary" style="display:none;">Rolü Değiştir</button>
+        <button id="logout" class="btn secondary" style="display:none;">Çıkış</button>
+      </div>
+    </div>
+
+    <!-- Rol seçimi modal -->
+    <div id="roleModal">
+      <div class="modal-content">
+        <h3>Rolünü Seç</h3>
+        <p class="muted">Bu seçim <b>bu cüzdan</b> için yerel olarak kaydedilir.</p>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" onclick="saveRoleForWallet('employer')">İşveren</button>
+          <button class="btn secondary" onclick="saveRoleForWallet('freelancer')">Freelancer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- İşveren: ilan verme -->
+    <div id="employerTools" class="section" style="display:none;">
+      <h3>İlan Ver <span class="muted">(bütçe kontrata kilitlenir)</span></h3>
+      <div class="grid">
+        <div class="card">
+          <label>Başlık</label>
+          <input id="title" placeholder="Örn: Landing Page tasarım" />
+          <div class="spacer"></div>
+
+          <label>Açıklama</label>
+          <textarea id="desc" placeholder="İş detayını yaz..."></textarea>
+          <div class="spacer"></div>
+
+          <label>Bütçe (ETH)</label>
+          <input id="budget" placeholder="0.05" />
+          <div class="spacer"></div>
+
+          <button id="postJob" class="btn">İlanı Yayınla (deposit)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Genel liste -->
+    <div id="lists" class="section" style="display:none;">
+      <div class="row">
+        <h3 id="listTitle">İlanlar</h3>
+      </div>
+      <div id="jobs" class="grid"></div>
+    </div>
+
+    <!-- İşveren: kendi ilanları -->
+    <div id="employerMine" class="section" style="display:none;">
+      <h3>Benim İlanlarım</h3>
+      <div id="myJobs" class="grid"></div>
+    </div>
+
+    <!-- Freelancer: paneller -->
+    <div id="freelancerBoards" class="section" style="display:none;">
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">
+        <div class="card">
+          <h3>Başvurduğum İlanlar</h3>
+          <div id="myApps"></div>
+        </div>
+        <div class="card">
+          <h3>Bana Atananlar</h3>
+          <div id="myAssignments"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast alanı -->
+  <div id="toasts"></div>
+
+  <!-- Uygulama betikleri -->
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
